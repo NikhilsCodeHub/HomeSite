@@ -5,7 +5,7 @@ createFormula <- function(yterm, xterm){
 
 
 createModels <- function(fmla, idata, modelNm,...){
-  
+
   ### modelNm in "lm", "rpart", "rf", "gbm", "glm"
   fit <- sapply(fmla, train, data= idata, method=modelNm, simplify = FALSE,...)
   ## simplify = TRUE --- outputs the fit in matrix format.
@@ -14,14 +14,21 @@ createModels <- function(fmla, idata, modelNm,...){
   return(fit)
 }
 
-createFits <- function(df){
+createglmFit <- function(df){
   fitControl <- trainControl(method = "cv", number = 5)
-  fit <- train(QuoteConversion_Flag~., data = df, method = "rf", trControl = fitControl)
-  
+  fit <- train(QuoteConversion_Flag~., data = df, method = "glm", trControl = fitControl)
+  return(fit)
 }
 
 
-createModelFits <- function(df, method){
+createRpartFits <- function(df,minsplit = 10, cp = 0.01, xval = 10)
+{
+  fit.rpart <- rpart(as.factor(QuoteConversion_Flag)~., data = df, method = "class", control = rpart.control(minsplit = minsplit, cp = cp, xval = xval))
+  return(fit.rpart)
+
+}
+
+createCaretModelFits <- function(df, method){
   print(date())
   #print(colnames(df)[2])
   set.seed(2016)
@@ -35,10 +42,10 @@ createModelFits <- function(df, method){
 ## ptype -- raw or prob
 ## newData -- Test dataset to predict on
 generatePredictions <- function(lstFit, newData, ptype){
-  print(names(lstFit))
+  #print(names(lstFit))
   set.seed(2016)
-  pred <- lapply(lstFit, predict.train, newdata=newData, type=ptype)
-  return(as.data.frame(pred))
+  pred <- lapply(lstFit, predict, newdata=newData, type=ptype)
+  return(data.frame(pred))
 }
 
 calculateRMSE <- function(predictons, reference){
@@ -50,27 +57,45 @@ calcConfusionMx <- function(predictons, reference){
   return(cnfMx)
 }
 
+extractFalsePN <- function(cnfMatrixGrid, df)
+{
+  l1 <- dim(cnfMatrixGrid)[2]-1
+  for (i in c(1:l1))
+  {
+    #print(i)
+    if(i==1)
+    {
+      df_out <- df[!cnfMatrixGrid[,1]==cnfMatrixGrid[,i],]
+    }
+    else
+    {
+      df_out <- rbind(df_out, df[!cnfMatrixGrid[,1]==cnfMatrixGrid[,i],])
+    }
+  }
+  return(df_out)
+}
+
 
 process_personal_16_17_18_19 <- function(dfData){
   dfData$PersonalField16A <- substr(x = dfData$PersonalField16,start = 1,stop = 1)
   dfData$PersonalField16B <- substr(x = dfData$PersonalField16,start = 2,stop = 2)
-  
+
   dfData$PersonalField17A <- substr(x = dfData$PersonalField17,start = 1,stop = 1)
   dfData$PersonalField17B <- substr(x = dfData$PersonalField17,start = 2,stop = 2)
-  
+
   dfData$PersonalField18A <- substr(x = dfData$PersonalField18,start = 1,stop = 1)
   dfData$PersonalField18B <- substr(x = dfData$PersonalField18,start = 2,stop = 2)
-  
+
   dfData$PersonalField19A <- substr(x = dfData$PersonalField19,start = 1,stop = 1)
   dfData$PersonalField19B <- substr(x = dfData$PersonalField19,start = 2,stop = 2)
-  
+
 #    dfData <- dfData[,-"PersonalField16"]
 #    dfData <- dfData[,-"PersonalField17"]
 #    dfData <- dfData[,-"PersonalField18"]
 #    dfData <- dfData[,-"PersonalField19"]
    dfData <- tbl_df(dfData)
    dfData <- select(dfData,-PersonalField16, -PersonalField17, -PersonalField18, -PersonalField19)
-  
+
   return(data.frame(dfData))
 }
 
@@ -78,48 +103,45 @@ set_factor_levels <- function(dfData, dfSummary){
 
   counter <- 1
   for(col in colnames(dfData)){
-    print("-------------------------")
-    print(paste("Processing - ", col))
-    print(dfSummary[dfSummary$colNames==col,"typeOfCol"])
-    print(dfSummary[dfSummary$colNames==col,"colLevels"])
+#     print("-------------------------")
+#     print(paste("Processing - ", col))
+#     print(dfSummary[dfSummary$colNames==col,"typeOfCol"])
+#     print(dfSummary[dfSummary$colNames==col,"colLevels"])
     rnames <- strsplit(dfSummary[dfSummary$colNames==col,"colLevels"],",")[[1]]
-    print(dfSummary[dfSummary$colNames==col,"colNames"])
-    if (dfSummary[dfSummary$colNames==col,"typeOfCol"] == "character")    
+    # print(dfSummary[dfSummary$colNames==col,"colNames"])
+    if (dfSummary[dfSummary$colNames==col,"typeOfCol"] == "character")
     {
-      print("this is a character column type")
-      print(dfSummary[dfSummary$colNames==col,"nlevels"])
+#       print("this is a character column type")
+#       print(dfSummary[dfSummary$colNames==col,"nlevels"])
       if (length(grepl("Y|N",rnames))==length(rnames) & length(rnames) == 2)
       {
-        print("Found Y and N")
-        print(rnames)
-#         newLevels <- paste(rnames,substr(col, 1,2), counter, sep = "" )
-#         dfData[,col] <- factor(dfData[,col], levels=rnames, labels = newLevels)
+#         print("Found Y and N")
+#         print(rnames)
+
         dfData[,col] <- factor(dfData[,col], levels=rnames)
-        
-      } 
+
+      }
       else if (length(grepl("[A-Z]",rnames))==length(rnames)  & any(grepl("[A-Z]",rnames)))
       {
-        print("Found A - Z")
-        print(rnames)
-#         newLevels <- paste(rnames, substr(col, 1,2), counter, sep = "" )
-#         dfData[,col] <- factor(dfData[,col], levels=rnames, labels = newLevels)
+#         print("Found A - Z")
+#         print(rnames)
         dfData[,col] <- factor(dfData[,col], levels=rnames)
-      
+
       }
     }
     else if (dfSummary[dfSummary$colNames==col,"typeOfCol"] == "integer" & dfSummary[dfSummary$colNames==col,"nlevels"] < 27)
     {
-      print("Found integers")
+      # print("Found integers")
       dfData[,col] <- factor(dfData[,col], levels=rnames)
-    } 
+    }
     else
     {
-      print("Not a character type")
+      # print("Not a character type")
     }
-    
+
     counter <- counter +1
   }
-    
+
   return(dfData)
 }
 
@@ -131,7 +153,7 @@ impute_missing_values <- function(col_vector){
   if (length(unique(col_vector)) < 27){
     rnames <- rownames(table(col_vector))
     if (length(grepl("Y|N",rnames))==length(rnames) & length(rnames) == 2){
-      misng <- length(is.na(col_vector)) 
+      misng <- length(is.na(col_vector))
       ratioYN <- length(col_vector[col_vector=="Y" & !is.na(col_vector)])/length(col_vector[col_vector=="N" & !is.na(col_vector)])
 
 
@@ -155,10 +177,10 @@ impute_missing_values <- function(col_vector){
           col_vector[is.na(col_vector)] <- "Y"
         }
       }
-        
+
     }
-  
-  }  
+
+  }
   return(col_vector)
 }
 
@@ -166,12 +188,12 @@ impute_missing_values <- function(col_vector){
 tabulate_missing_values <- function(dfData) {
   dfData <- data.frame(dfData)
   na.cols <- sapply(dfData[,1:dim(dfData)[2]],anyNA)
-  
+
   na.cols <- data.frame(ColNames=rownames(data.frame(na.cols)),ColNA = na.cols, stringsAsFactors = FALSE)
-  
+
   na.cols <- na.cols[na.cols$ColNA,]
   na.cols <- tbl_df(na.cols)
-  
+
   for (col in na.cols$ColNames)
   {
     #print(col)
@@ -201,7 +223,7 @@ dataset_summary <- function(dfTrain, dfTest, colOutcome){
     #print(typeof(dfData[,col]))
     df$nlevels[df$colNames==col] <- as.integer(length(unique(dfData[,col])))
     #print(as.integer(length(unique(dfData[,col]))))
-    
+
     if (length(unique(dfData[,col]))[1] < 27){
       df[df$colNames==col, "colLevels"] <- paste(rownames(table(dfData[,col])), collapse = ",")
       #print(paste(rownames(table(dfData[,col])), collapse = ","))
@@ -213,13 +235,13 @@ dataset_summary <- function(dfTrain, dfTest, colOutcome){
     df$naRowCount[df$colNames==col] <- length(dfData[is.na(dfData[,col]),col])[1]
   }
   return(df)
-  
-  
+
+
 }
 
 ##
 ## --- To be called when requiring multiple datasets based on list of rowindexes.
-## 
+##
 createTrainDS <- function(ls, df){
   return(df[ls])
 }
@@ -230,9 +252,9 @@ createTestDS <- function(ls, df){
 
 
 split_datasets <- function(dfData){
-  
+
   dfData <- tbl_df(dfData)
-  
+
   dfpersonal <- select(dfData, QuoteConversion_Flag, starts_with("Field"), starts_with("PersonalField"))
   dfproperty <- select(dfData, QuoteConversion_Flag, starts_with("PropertyField"))
   dfgeo <- select(dfData, QuoteConversion_Flag, starts_with("GeographicField"))
@@ -244,7 +266,7 @@ split_datasets <- function(dfData){
 
 
 # feature.names=names(dtrain_final)
-# 
+#
 # for (f in feature.names) {
 #   if (class(dtrain_final[[f]])=="factor") {
 #     levels <- unique(c(dtrain_final[[f]]))
@@ -263,6 +285,6 @@ check_colNames <- function(df){
       print(paste(levels(df[,col]), collapse = ", "))
       #print(make.names(levels(df[,col])))
     }
-    
+
   }
 }
