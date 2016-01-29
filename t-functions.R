@@ -43,11 +43,13 @@ createRpartFits <- function(df,minsplit = 10, cp = 0.01, xval = 10)
 
 }
 
+
+
 createCaretModelFits <- function(df, method){
   print(date())
   #print(colnames(df)[2])
   set.seed(2016)
-  fitControl <- trainControl(method = "repeatedcv", number = 5, repeats = 5, classProbs = FALSE)
+  fitControl <- trainControl(method = "cv", number = 5, repeats = 5, classProbs = FALSE)
   fit <- train(as.factor(QuoteConversion_Flag)~., data = df, method = method, trControl = fitControl)
   print(date())
   return(fit)

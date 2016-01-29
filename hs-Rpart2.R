@@ -4,8 +4,14 @@
    library(rpart)
    library(randomForest)
    library(caret)
+   library(gbm)
    library(dplyr)
    library(lubridate)
+   library(rattle)
+   library(rpart.plot)
+   library(RColorBrewer)
+   library(doMC)
+   registerDoMC(cores = 4)
 
 
    source("t-functions.R", echo = FALSE)
@@ -23,13 +29,18 @@
 
    lst_dsTrain <- createDataSplits(df = dftrain, "GeographicField64")
    lst_dsValidate <- createDataSplits(df = dfvalidate, "GeographicField64")
-   rm(dftrain)
-   rm(dfvalidate)
+#   rm(dftrain)
+#   rm(dfvalidate)
 
    ## -------------------------------------------------
 
    print(paste(date(), " - Generating Rpart Models."))
-   fit.rpart <- lapply(lst_dsTrain, createRpartFits)
+   fit.rpart <- lapply(lst_dsTrain, createRpartFits, minsplit = 7, cp = 0.01 ,xval=30)
+   fit.rf <- randomForest(as.factor(QuoteConversion_Flag)~., lst_dsTrain[[1]], ntree = 1000)
+   fit.gbm <- gbm(formula = as.factor(QuoteConversion_Flag)~., data =  dftrain, n.trees = 500, cv.folds = 10, n.cores = 3, verbose = FALSE)
+
+
+   # fancyRpartPlot(fit.rpart[[1]])
 
 
    print(paste(date(), " - Generating Prediction on Validation Dataset."))
@@ -40,35 +51,26 @@
    lstPred.raw <- vector('list', length = length(fit.rpart))
    for (i in 1:length(fit.rpart))
    {
-      lstPred.raw[[i]] <- data.frame(predict(fit.rpart[[i]], lst_dsValidate[[i]], type = 'class'))
-      colnames(lstPred.raw[[i]]) <- paste("p", i, sep = "")
+      lstPred.raw[[i]] <- data.frame(predict(fit.rpart[[i]], lst_dsValidate[[i]], type = 'prob'))
+      #colnames(lstPred.raw[[i]]) <- c("x0", "x1")
+      lstPred.raw[[i]] <- cbind("QF" = lst_dsValidate[[i]]$QuoteConversion_Flag,  lstPred.raw[[i]])
    }
 
 
    print(paste(date(), " - Appending Reference Column from Validation Dataset for Evaluation."))
-   for(i in 1:length(lst_dsValidate))
-   {
-      lstPred.raw[[i]] <- cbind(lst_dsValidate[[i]]$QuoteConversion_Flag,  lstPred.raw[[i]])
-      #lstPred.prob[[i]] <- cbind(lst_dsValidate[[i]]$QuoteConversion_Flag,  lstPred.prob[[i]][,2])
-      #colnames(lstPred.raw[[i]]) <- c(paste("QF", i, sep=""), paste("p", seq(1:dim(lstPred.raw[[i]])[2]-1), sep = ""))
-      #colnames(lstPred.prob[[i]]) <- c(paste("QF", i, sep=""), paste("p", seq(1:dim(lstPred.prob[[i]])[2]-1), sep = ""))
-   }
 
-#    dfPred <- cbind(lst_dsValidate[[1]]$QuoteConversion_Flag, pred.rpart.raw)
-#    colnames(dfPred) <- c("QuoteConversion_Flag", paste("p", seq(1:nfolds), sep = ""))
-
-
-
-#    print(paste(date(), " - Converting Probability Predictions to Dataframe."))
-#    dfPred.prob <- cbind(lst_dsValidate[[1]]$QuoteConversion_Flag, pred.rpart.prob[,c(-seq(1,(2*(nfolds-1))+1,2))])
-#    ## -seq(1,(2*(nfolds-1))+1,2) : -1, -3, -5, -7
-#    ##
-#
-#    colnames(dfPred.prob) <- c("QuoteConversion_Flag", paste("p", seq(1:nfolds), sep = ""))
-#
 
    print(paste(date(), " - Creating Confusion Matrix for Evaluation."))
-   cnfMx <- calcConfusionMx(pred.rpart.raw, lst_dsValidate[[1]]$QuoteConversion_Flag)
+
+   cnfMx <- vector('list', length = length(lstPred.raw))
+   for (i in 1:length(lstPred.raw))
+   {
+      cnfMx[[i]] <- confusionMatrix(lstPred.raw[[i]]$pred, lstPred.raw[[i]]$QF)
+   }
+
+
+
+
 
    print(paste(date(), " - Extracting False Positives and False Negatives."))
    dfMisClass <- extractFalsePN(cnfMatrixGrid = dfPred, df = dtrain_final)
