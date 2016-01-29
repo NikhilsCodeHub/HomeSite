@@ -1,3 +1,18 @@
+
+createDataSplits <- function(df, col)
+{
+   lstvalues <- unique(df[,col])
+   nvalues <- length(lstvalues)
+   lst_df <- vector('list', length = nvalues)
+   for (i in 1:nvalues)
+   {
+      lst_df[[i]] <- df %>% tbl_df() %>% filter(df[,col] == lstvalues[i])
+   }
+   return(lst_df)
+}
+
+
+
 createFormula <- function(yterm, xterm){
   fmla <- paste(yterm, sapply(xterm, paste,collapse="+"), sep = "~")
   return(sapply(fmla, formula))
@@ -46,6 +61,18 @@ generatePredictions <- function(lstFit, newData, ptype){
   set.seed(2016)
   pred <- lapply(lstFit, predict, newdata=newData, type=ptype)
   return(data.frame(pred))
+}
+
+
+generatePredictionList <- function(lstFit, lstnewData, ptype){
+   #print(names(lstFit))
+   set.seed(2016)
+   pred <- vector('list', length = length(lstFit))
+   for (i in 1:length(lstFit))
+   {
+      pred <- data.frame(predict(lstFit[[i]], lstnewData[[i]], type = ptype))
+   }
+   return(pred)
 }
 
 calculateRMSE <- function(predictons, reference){
@@ -107,37 +134,49 @@ set_factor_levels <- function(dfData, dfSummary){
 #     print(paste("Processing - ", col))
 #     print(dfSummary[dfSummary$colNames==col,"typeOfCol"])
 #     print(dfSummary[dfSummary$colNames==col,"colLevels"])
+#
+
     rnames <- strsplit(dfSummary[dfSummary$colNames==col,"colLevels"],",")[[1]]
+    if (dfSummary[dfSummary$colNames==col,"nlevels"] < 27)
+    {
+       dfData[,col] <- factor(dfData[,col], levels=rnames)
+    }
+
     # print(dfSummary[dfSummary$colNames==col,"colNames"])
-    if (dfSummary[dfSummary$colNames==col,"typeOfCol"] == "character")
-    {
-#       print("this is a character column type")
-#       print(dfSummary[dfSummary$colNames==col,"nlevels"])
-      if (length(grepl("Y|N",rnames))==length(rnames) & length(rnames) == 2)
-      {
-#         print("Found Y and N")
-#         print(rnames)
-
-        dfData[,col] <- factor(dfData[,col], levels=rnames)
-
-      }
-      else if (length(grepl("[A-Z]",rnames))==length(rnames)  & any(grepl("[A-Z]",rnames)))
-      {
-#         print("Found A - Z")
-#         print(rnames)
-        dfData[,col] <- factor(dfData[,col], levels=rnames)
-
-      }
-    }
-    else if (dfSummary[dfSummary$colNames==col,"typeOfCol"] == "integer" & dfSummary[dfSummary$colNames==col,"nlevels"] < 27)
-    {
-      # print("Found integers")
-      dfData[,col] <- factor(dfData[,col], levels=rnames)
-    }
-    else
-    {
-      # print("Not a character type")
-    }
+#     if (dfSummary[dfSummary$colNames==col,"typeOfCol"] == "character")
+#     {
+# #       print("this is a character column type")
+# #       print(dfSummary[dfSummary$colNames==col,"nlevels"])
+#       if (length(grepl("Y|N",rnames))==length(rnames) & length(rnames) == 2)
+#       {
+# #         print("Found Y and N")
+# #         print(rnames)
+#
+#         dfData[,col] <- factor(dfData[,col], levels=rnames)
+#
+#       }
+#       else if (length(grepl("[A-Z]",rnames))==length(rnames)  & any(grepl("[A-Z]",rnames)))
+#       {
+# #         print("Found A - Z")
+# #         print(rnames)
+#         dfData[,col] <- factor(dfData[,col], levels=rnames)
+#
+#       }
+#        else
+#        {
+#           dfData[,col] <- factor(dfData[,col], levels=rnames)
+#
+#        }
+#     }
+#     else if (dfSummary[dfSummary$colNames==col,"typeOfCol"] == "integer" & dfSummary[dfSummary$colNames==col,"nlevels"] < 27)
+#     {
+#       # print("Found integers")
+#       dfData[,col] <- factor(dfData[,col], levels=rnames)
+#     }
+#     else
+#     {
+#       # print("Not a character type")
+#     }
 
     counter <- counter +1
   }

@@ -7,7 +7,7 @@
   library(randomForest)
   library(caret)
   library(dplyr)
-
+  library(lubridate)
 
 
   source("t-functions.R", echo = FALSE)
@@ -15,27 +15,30 @@
   print(paste(date(), " - Loading and Cleaning Data."))
   source("hs-loadnclean.R")
 
-  print(paste(date(), " - Creating Training Folds."))
-  nfolds <- 4
-  set.seed(2016)
-  ftrain <- createFolds(dtrain_final$GeographicField64, k = nfolds , list = TRUE, returnTrain = FALSE)
+#   print(paste(date(), " - Creating Training Folds."))
+#   nfolds <- 4
+#   set.seed(2016)
+#   ftrain <- createFolds(dtrain_final$GeographicField64, k = nfolds , list = TRUE, returnTrain = FALSE)
+#
+#   print(paste(date(), " - Creating Fold Datasets for Training."))
+#   lst_dsTrain <- vector("list", length = nfolds)
+#   for (i in 1:nfolds)
+#   {
+#     lst_dsTrain[[i]] <- dtrain_final[ftrain[[i]],]
+#   }
+#
+#   print(paste(date(), " - Creating Validation Folds."))
+#   fValidate <- createFolds(dtrain_final$QuoteConversion_Flag, 2, list = TRUE, returnTrain = TRUE)
+#
+#   print(paste(date(), " - Creating Fold Datasets for Validation."))
+#   lst_dsValidate <- vector("list", length = 2)
+#   for (i in 1:2)
+#   {
+#     lst_dsValidate[[i]] <- dtrain_final[fValidate[[i]],]
+#   }
 
-  print(paste(date(), " - Creating Fold Datasets for Training."))
-  lst_dsTrain <- vector("list", length = nfolds)
-  for (i in 1:nfolds)
-  {
-    lst_dsTrain[[i]] <- dtrain_final[ftrain[[i]],]
-  }
 
-  print(paste(date(), " - Creating Validation Folds."))
-  fValidate <- createFolds(dtrain_final$QuoteConversion_Flag, 2, list = TRUE, returnTrain = TRUE)
-
-  print(paste(date(), " - Creating Fold Datasets for Validation."))
-  lst_dsValidate <- vector("list", length = 2)
-  for (i in 1:2)
-  {
-    lst_dsValidate[[i]] <- dtrain_final[fValidate[[i]],]
-  }
+  ## -------------------------------------------------
 
   print(paste(date(), " - Generating Rpart Models."))
   fit.rpart <- lapply(lst_dsTrain, createRpartFits)
@@ -80,6 +83,8 @@
 #     fit.combo <- createglmFit(df = dfPred.prob)
 #     fit.combo <- lm(QuoteConversion_Flag~., dfPred.prob)
     fit.combo <- createRpartFits(df = dfPred.prob,minsplit = 3,xval = 20, cp = 0.01)
+
+    ## -------------------------------------------------
 
 ##
 ## ---- Validation Testing
