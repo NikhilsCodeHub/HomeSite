@@ -1,14 +1,14 @@
 
 createDataSplits <- function(df, col)
 {
-   lstvalues <- unique(df[,col])
-   nvalues <- length(lstvalues)
-   lst_df <- vector('list', length = nvalues)
-   for (i in 1:nvalues)
-   {
-      lst_df[[i]] <- df %>% tbl_df() %>% filter(df[,col] == lstvalues[i])
-   }
-   return(lst_df)
+  lstvalues <- sort(unique(df[,col]))
+  nvalues <- length(lstvalues)
+  lst_df <- vector('list', length = nvalues)
+  for (i in 1:nvalues)
+  {
+    lst_df[[i]] <- df %>% tbl_df() %>% filter(df[,col] == lstvalues[i])
+  }
+  return(lst_df)
 }
 
 
@@ -49,7 +49,7 @@ createCaretModelFits <- function(df, method){
   print(date())
   #print(colnames(df)[2])
   set.seed(2016)
-  fitControl <- trainControl(method = "cv", number = 5, repeats = 5, classProbs = FALSE)
+  fitControl <- trainControl(method = "repeatedcv", number = 5, repeats = 5, classProbs = FALSE)
   fit <- train(as.factor(QuoteConversion_Flag)~., data = df, method = method, trControl = fitControl)
   print(date())
   return(fit)
@@ -67,14 +67,14 @@ generatePredictions <- function(lstFit, newData, ptype){
 
 
 generatePredictionList <- function(lstFit, lstnewData, ptype){
-   #print(names(lstFit))
-   set.seed(2016)
-   pred <- vector('list', length = length(lstFit))
-   for (i in 1:length(lstFit))
-   {
-      pred <- data.frame(predict(lstFit[[i]], lstnewData[[i]], type = ptype))
-   }
-   return(pred)
+  #print(names(lstFit))
+  set.seed(2016)
+  pred <- vector('list', length = length(lstFit))
+  for (i in 1:length(lstFit))
+  {
+    pred[[i]] <- data.frame(predict(lstFit[[i]], lstnewData[[i]], type = ptype))
+  }
+  return(pred)
 }
 
 calculateRMSE <- function(predictons, reference){
@@ -85,6 +85,16 @@ calcConfusionMx <- function(predictons, reference){
   cnfMx <- sapply(predictons, confusionMatrix, reference, simplify = FALSE)
   return(cnfMx)
 }
+
+calcConfusionMxList <- function(lst_predictons, lst_reference){
+  lstcnfMx <- vector('list', length = length(lst_predictons))
+  for (i in 1:length(lst_predictons))
+  {
+    lstcnfMx[[i]] <- confusionMatrix(round(lst_predictons[[i]]$X1), lst_reference[[i]]$QuoteConversion_Flag)
+  }
+  return(lstcnfMx)
+}
+
 
 extractFalsePN <- function(cnfMatrixGrid, df)
 {
@@ -118,12 +128,12 @@ process_personal_16_17_18_19 <- function(dfData){
   dfData$PersonalField19A <- substr(x = dfData$PersonalField19,start = 1,stop = 1)
   dfData$PersonalField19B <- substr(x = dfData$PersonalField19,start = 2,stop = 2)
 
-#    dfData <- dfData[,-"PersonalField16"]
-#    dfData <- dfData[,-"PersonalField17"]
-#    dfData <- dfData[,-"PersonalField18"]
-#    dfData <- dfData[,-"PersonalField19"]
-   dfData <- tbl_df(dfData)
-   dfData <- select(dfData,-PersonalField16, -PersonalField17, -PersonalField18, -PersonalField19)
+  #    dfData <- dfData[,-"PersonalField16"]
+  #    dfData <- dfData[,-"PersonalField17"]
+  #    dfData <- dfData[,-"PersonalField18"]
+  #    dfData <- dfData[,-"PersonalField19"]
+  dfData <- tbl_df(dfData)
+  dfData <- select(dfData,-PersonalField16, -PersonalField17, -PersonalField18, -PersonalField19)
 
   return(data.frame(dfData))
 }
@@ -132,53 +142,53 @@ set_factor_levels <- function(dfData, dfSummary){
 
   counter <- 1
   for(col in colnames(dfData)){
-#     print("-------------------------")
-#     print(paste("Processing - ", col))
-#     print(dfSummary[dfSummary$colNames==col,"typeOfCol"])
-#     print(dfSummary[dfSummary$colNames==col,"colLevels"])
-#
+    #     print("-------------------------")
+    #     print(paste("Processing - ", col))
+    #     print(dfSummary[dfSummary$colNames==col,"typeOfCol"])
+    #     print(dfSummary[dfSummary$colNames==col,"colLevels"])
+    #
 
     rnames <- strsplit(dfSummary[dfSummary$colNames==col,"colLevels"],",")[[1]]
     if (dfSummary[dfSummary$colNames==col,"nlevels"] < 27)
     {
-       dfData[,col] <- factor(dfData[,col], levels=rnames)
+      dfData[,col] <- factor(dfData[,col], levels=rnames)
     }
 
     # print(dfSummary[dfSummary$colNames==col,"colNames"])
-#     if (dfSummary[dfSummary$colNames==col,"typeOfCol"] == "character")
-#     {
-# #       print("this is a character column type")
-# #       print(dfSummary[dfSummary$colNames==col,"nlevels"])
-#       if (length(grepl("Y|N",rnames))==length(rnames) & length(rnames) == 2)
-#       {
-# #         print("Found Y and N")
-# #         print(rnames)
-#
-#         dfData[,col] <- factor(dfData[,col], levels=rnames)
-#
-#       }
-#       else if (length(grepl("[A-Z]",rnames))==length(rnames)  & any(grepl("[A-Z]",rnames)))
-#       {
-# #         print("Found A - Z")
-# #         print(rnames)
-#         dfData[,col] <- factor(dfData[,col], levels=rnames)
-#
-#       }
-#        else
-#        {
-#           dfData[,col] <- factor(dfData[,col], levels=rnames)
-#
-#        }
-#     }
-#     else if (dfSummary[dfSummary$colNames==col,"typeOfCol"] == "integer" & dfSummary[dfSummary$colNames==col,"nlevels"] < 27)
-#     {
-#       # print("Found integers")
-#       dfData[,col] <- factor(dfData[,col], levels=rnames)
-#     }
-#     else
-#     {
-#       # print("Not a character type")
-#     }
+    #     if (dfSummary[dfSummary$colNames==col,"typeOfCol"] == "character")
+    #     {
+    # #       print("this is a character column type")
+    # #       print(dfSummary[dfSummary$colNames==col,"nlevels"])
+    #       if (length(grepl("Y|N",rnames))==length(rnames) & length(rnames) == 2)
+    #       {
+    # #         print("Found Y and N")
+    # #         print(rnames)
+    #
+    #         dfData[,col] <- factor(dfData[,col], levels=rnames)
+    #
+    #       }
+    #       else if (length(grepl("[A-Z]",rnames))==length(rnames)  & any(grepl("[A-Z]",rnames)))
+    #       {
+    # #         print("Found A - Z")
+    # #         print(rnames)
+    #         dfData[,col] <- factor(dfData[,col], levels=rnames)
+    #
+    #       }
+    #        else
+    #        {
+    #           dfData[,col] <- factor(dfData[,col], levels=rnames)
+    #
+    #        }
+    #     }
+    #     else if (dfSummary[dfSummary$colNames==col,"typeOfCol"] == "integer" & dfSummary[dfSummary$colNames==col,"nlevels"] < 27)
+    #     {
+    #       # print("Found integers")
+    #       dfData[,col] <- factor(dfData[,col], levels=rnames)
+    #     }
+    #     else
+    #     {
+    #       # print("Not a character type")
+    #     }
 
     counter <- counter +1
   }
